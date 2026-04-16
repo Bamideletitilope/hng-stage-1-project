@@ -41,7 +41,7 @@ router.post('/profiles', async (req, res) => {
 );
 
 if (existing.rows.length > 0) {
-    return res.json({
+    return res.status(200).json({
         status: "success",
         message: "Profile already exists",
         data: existing.rows[0]
@@ -58,21 +58,21 @@ if (existing.rows.length > 0) {
     const { age } = ageRes.data;
     const countries = countryRes.data.country;
     //EDGE CASES
-        if(!gender || probability ||count === 0) {
-            return res.status(502).json({
+        if(!gender ||count === 0) {
+            return res.status(422).json({
                 status: "error",
                 message: "No gender data found"
             });
         }
 
         if(age === null) {
-            return res.status(502).json({
+            return res.status(422).json({
                 status: "error",
                 message: "No age data found"
             })
         }
         if(!countries || countries.length === 0) {
-            return res.status(502).json({
+            return res.status(422).json({
                 status: "error",
                 message: "No country data found"
             })
@@ -86,7 +86,7 @@ if (existing.rows.length > 0) {
     else age_group = "senior";
 
     //BEST COUNTRY
-    const bestCountry = countries.reduce((prev, curr) =>
+    const bestCountry = countries?.reduce((prev, curr) =>
     curr.probability > prev.probability ? curr : prev);
     
     const id = uuidv7();
@@ -108,7 +108,7 @@ if (existing.rows.length > 0) {
             created_at
         ]
     );
-    res.json({
+    return res.status(201).json({
         status : "success",
         data: {
             id,
@@ -125,12 +125,116 @@ if (existing.rows.length > 0) {
         }
     });
     }catch (error) {
-        res.status(500).json({
+        console.error(error);
+
+       return res.status(500).json({
             status: "error",
-            message: "error fetching data from external APIs"
+            message: "Internal server error"
         });
     }
 
+});
+
+//GET ALL PROFILE
+router.get('/profiles', async (req, res) => {
+    try {
+        const { gender, age_group, country_id } = req.query;
+
+        let query = "SELECT * FROM profiles WHERE 1=1";
+        const values = [];
+        let count = 1;
+
+        if (gender) {
+            query += ` AND gender = $${count++}`;
+            values.push(gender.toLowerCase());
+        }
+
+        if (age_group) {
+            query += ` AND age_group = $${count++}`;
+            values.push(age_group.toLowerCase());
+        }
+
+        if (country_id) {
+            query += ` AND country_id = $${count++}`;
+            values.push(country_id.toUpperCase());
+        }
+
+        const result = await pool.query(query, values);
+
+        return res.status(200).json({
+            status: "success",
+            data: result.rows
+        });
+
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({
+            status: "error",
+            message: "Failed to fetch profiles"
+        });
+    }
+});
+
+//GET PROFILE BY ID
+router.get('/profiles/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const result = await pool.query(
+            "SELECT * FROM profiles WHERE id = $1",
+            [id]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({
+                status: "error",
+                message: "Profile not found"
+            });
+        }
+
+        return res.json({
+            status: "success",
+            data: result.rows[0]
+        });
+
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({
+            status: "error",
+            message: "Error fetching profile"
+        });
+    }
+});
+
+//DELETE PROFILE
+router.delete('/profiles/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const result = await pool.query(
+            "DELETE FROM profiles WHERE id = $1 RETURNING *",
+            [id]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({
+                status: "error",
+                message: "Profile not found"
+            });
+        }
+
+        return res.json({
+            status: "success",
+            message: "Profile deleted"
+        });
+
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({
+            status: "error",
+            message: "Error deleting profile"
+        });
+    }
 });
 
 module.exports = router;
