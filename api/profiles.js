@@ -4,7 +4,7 @@ const router = express.Router();
 const axios = require('axios');
 //const cors = require('cors');
 const pool = require('../database/db');
-const { v7: uuidv7 } = require('uuidv7');
+const { v4: uuidv4 } = require('uuidv4');
 
 
 
@@ -89,7 +89,7 @@ if (existing.rows.length > 0) {
     const bestCountry = countries?.reduce((prev, curr) =>
     curr.probability > prev.probability ? curr : prev);
     
-    const id = uuidv7();
+    const id = uuidv4();
     const created_at = new Date().toISOString();
     await pool.query(
         `INSERT INTO profiles 
